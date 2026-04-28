@@ -1,6 +1,11 @@
 #include "server/ListeningSocket.hpp"
 #include "utils/Logger.hpp"
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <poll.h>
 
 ListeningSocket::ListeningSocket()
     : _fd(-1), _host(""), _port(0) {}
@@ -26,6 +31,11 @@ bool ListeningSocket::open(const std::string& host, int port, int backlog) {
         return false;
     }
     fcntl(sockfd, F_SETFL, O_NONBLOCK);
+    if (sockfd >= FD_SETSIZE){
+        Logger::error("Too many listening sockets..");
+        ::close(sockfd);
+        return false;
+    }
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);

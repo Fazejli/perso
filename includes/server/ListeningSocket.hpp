@@ -3,12 +3,6 @@
 
 # include <string>
 
-#include "Webserv.hpp"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <poll.h>
 
 // Wraps a non-blocking TCP socket bound to a `host:port` and put in
 // listen() mode. Owns its file descriptor — non-copyable.

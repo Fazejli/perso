@@ -18,6 +18,11 @@ void Server::run() {
     Logger::info("  parsed servers in config: " + StringUtils::toString(_config.size()));
     Logger::info("  We are setting up listening sockets");
     setupListeningSockets();
+    if (_listeningSockets.empty()) {
+        Logger::error("No listening sockets. Exit...");
+        return ;
+    }
+    _running = true;
     Logger::info("Polling up");
     pollLoop();
     Logger::info("Nothing to do for now, exiting cleanly.");
@@ -28,7 +33,7 @@ void Server::stop() {
     _running = false;
 }
 
-bool checkDuplicate(std::vector<ListeningSocket*> sockets, const std::string host, int port){
+bool checkDuplicate(std::vector<ListeningSocket*>& sockets, const std::string host, int port){
     std::vector<ListeningSocket*>::const_iterator it = sockets.begin();
     while (it != sockets.end()){
         if ((*it)->getPort() == port && (*it)->getHost() == host)
@@ -61,7 +66,6 @@ void Server::setupListeningSockets() {
         Logger::info("Listenning on " + host + ":" + StringUtils::toString(port));
         ++it;
     }
-    _running = true;
 }
 
 void Server::teardown() {
@@ -111,7 +115,7 @@ void Server::pollLoop(){
             break ;
         }
         size_t count = _listeningSockets.size();
-        for(size_t i = 0; i < count; i++){
+        for(size_t i = 0; i < fds.size(); i++){
             if (fds[i].revents == 0)
                 continue;
             if (i < count){
@@ -129,7 +133,7 @@ void Server::pollLoop(){
                 }
             }
         }
-        //checkTimeouts();
+        checkTimeouts();
     }
 }
 
@@ -139,6 +143,12 @@ void Server::acceptNewConnection(ListeningSocket* sock){
     int clientfd = accept(sock->getFd(), &addr, &addrLen);
     if (clientfd < 0){
         Logger::error("Failed to accept new connection..");
+        return ;
+    }
+    fcntl(clientfd, F_SETFL, O_NONBLOCK);
+    if (clientfd >= FD_SETSIZE){
+        Logger::error("Too many clients..");
+        close(clientfd);
         return ;
     }
     Logger::info("New connection accepted.");
@@ -153,9 +163,9 @@ void Server::handleClientRead(Client* c){
         if (errno != EWOULDBLOCK && errno != EAGAIN){
             Logger::error("Failed to read from client..");
             closeClient(c);
+            return ;
         }
         Logger::warn("No data to read from client.");
-        return ;
     }
     else if (!msg_received){
         Logger::info("Client closed the connection.");
@@ -163,7 +173,8 @@ void Server::handleClientRead(Client* c){
         return ;
     }
     c->getReadBuffer().append(buffer, msg_received);
-    c->touch();
+    //Alimenter HTTP REQUEST
+    c->setState(Client::PROCESSING);
     Logger::info("Received data from client");
 }
 
@@ -174,12 +185,14 @@ void Server::handleClientWrite(Client* c){
         if (errno != EWOULDBLOCK && errno != EAGAIN){
             Logger::error("Failed to write to client..");
             closeClient(c);
+            return ;
         }
         Logger::warn("No data can be sent to client right now.");
-        return ;
     }
     c->getWriteBuffer().erase(0, msg_sent);
-    c->touch();
+    if (c->getWriteBuffer().empty()){
+        c->setState(Client::READING);
+    }
     Logger::info("Sent data to client");
 }
 
