@@ -47,16 +47,19 @@ void Server::setupListeningSockets() {
     {
         const std::string host = it->getHost();
         int port = it->getPort();
-        if (checkDuplicate(_listeningSockets, host, port))
-            continue ;
+        if (checkDuplicate(_listeningSockets, host, port)){
+            ++it;
+            continue ;}
         ListeningSocket *s = new ListeningSocket;
         if (!s->open(host, port, DEFAULT_BACKLOG)){
             Logger::error("Failed to open socket..");
             delete s;
+            ++it;
             continue ;
         }
         _listeningSockets.push_back(s);
         Logger::info("Listenning on " + host + ":" + StringUtils::toString(port));
+        ++it;
     }
     _running = true;
 }
