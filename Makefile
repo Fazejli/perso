@@ -14,22 +14,21 @@ SRCS        := $(shell find $(SRC_DIR) -name '*.cpp')
 OBJS        := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 DEPS        := $(OBJS:.o=.d)
 
+# Test binary — links against the project sources it needs (no main.o)
 TEST_DIR        := tests
 TEST_OBJ_DIR    := $(OBJ_DIR)/tests
-
-TEST_PARSER_BIN  := test_parser
-TEST_PARSER_SRCS := $(TEST_DIR)/test_parser.cpp \
-                    $(SRC_DIR)/http/HttpRequest.cpp \
-                    $(SRC_DIR)/utils/StringUtils.cpp
-TEST_PARSER_OBJS := $(TEST_PARSER_SRCS:%.cpp=$(TEST_OBJ_DIR)/%.o)
-
-TEST_INTERACTIVE_BIN  := test_interactive
-TEST_INTERACTIVE_SRCS := $(TEST_DIR)/test_interactive.cpp \
-                        $(SRC_DIR)/http/HttpRequest.cpp \
-                        $(SRC_DIR)/utils/StringUtils.cpp
-TEST_INTERACTIVE_OBJS := $(TEST_INTERACTIVE_SRCS:%.cpp=$(TEST_OBJ_DIR)/%.o)
-
-TEST_DEPS   := $(TEST_PARSER_OBJS:.o=.d) $(TEST_INTERACTIVE_OBJS:.o=.d)
+TEST_BIN        := run_tests
+TEST_SRCS       := $(TEST_DIR)/tests.cpp
+LIB_SRCS        := $(SRC_DIR)/http/HttpRequest.cpp \
+                   $(SRC_DIR)/config/ConfigParser.cpp \
+                   $(SRC_DIR)/config/Config.cpp \
+                   $(SRC_DIR)/config/ServerConfig.cpp \
+                   $(SRC_DIR)/config/LocationConfig.cpp \
+                   $(SRC_DIR)/utils/StringUtils.cpp \
+                   $(SRC_DIR)/utils/Logger.cpp
+TEST_ALL_SRCS   := $(TEST_SRCS) $(LIB_SRCS)
+TEST_OBJS       := $(TEST_ALL_SRCS:%.cpp=$(TEST_OBJ_DIR)/%.o)
+TEST_DEPS       := $(TEST_OBJS:.o=.d)
 
 GREEN       := \033[0;32m
 BLUE        := \033[0;34m
@@ -53,41 +52,25 @@ $(TEST_OBJ_DIR)/%.o: %.cpp
 	@printf "$(YELLOW)Compiling $<$(RESET)\n"
 	@$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
-$(TEST_PARSER_BIN): $(TEST_PARSER_OBJS)
-	@printf "$(BLUE)Linking $(TEST_PARSER_BIN)$(RESET)\n"
-	@$(CXX) $(CXXFLAGS) $(TEST_PARSER_OBJS) -o $@
-	@printf "$(GREEN)Built $(TEST_PARSER_BIN)$(RESET)\n"
+$(TEST_BIN): $(TEST_OBJS)
+	@printf "$(BLUE)Linking $(TEST_BIN)$(RESET)\n"
+	@$(CXX) $(CXXFLAGS) $(TEST_OBJS) -o $@
+	@printf "$(GREEN)Built $(TEST_BIN)$(RESET)\n"
 
-$(TEST_INTERACTIVE_BIN): $(TEST_INTERACTIVE_OBJS)
-	@printf "$(BLUE)Linking $(TEST_INTERACTIVE_BIN)$(RESET)\n"
-	@$(CXX) $(CXXFLAGS) $(TEST_INTERACTIVE_OBJS) -o $@
-	@printf "$(GREEN)Built $(TEST_INTERACTIVE_BIN)$(RESET)\n"
-
-test: $(TEST_PARSER_BIN)
-	@printf "$(BLUE)Running parser tests$(RESET)\n"
-	@./$(TEST_PARSER_BIN)
-
-interactive: $(TEST_INTERACTIVE_BIN)
-
-test_configs: $(NAME)
-	@for f in configs/valid/*.conf; do \
-		./$(NAME) $$f || echo "FAIL: $$f"; \
-	done
-	@for f in configs/invalid/*.conf; do \
-		./$(NAME) $$f 2>/dev/null && echo "UNEXPECTED PASS: $$f" || true; \
-	done
+test: $(TEST_BIN)
+	@./$(TEST_BIN)
 
 clean:
 	@printf "$(YELLOW)Cleaning object files$(RESET)\n"
 	@rm -rf $(OBJ_DIR)
 
 fclean: clean
-	@printf "$(YELLOW)Removing $(NAME)$(RESET)\n"
-	@rm -f $(NAME) $(TEST_PARSER_BIN) $(TEST_INTERACTIVE_BIN)
+	@printf "$(YELLOW)Removing binaries$(RESET)\n"
+	@rm -f $(NAME) $(TEST_BIN)
 
 re: fclean all
 
 -include $(DEPS)
 -include $(TEST_DEPS)
 
-.PHONY: all clean fclean re test interactive test_configs
+.PHONY: all clean fclean re test

@@ -22,6 +22,7 @@ bool ListeningSocket::open(const std::string& host, int port, int backlog) {
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0){
         Logger::error("Failed to setsockopt");
+        ::close(sockfd);
         return false;
     }
     fcntl(sockfd, F_SETFL, O_NONBLOCK);
@@ -30,20 +31,22 @@ bool ListeningSocket::open(const std::string& host, int port, int backlog) {
     addr.sin_port = htons(port);
     if (inet_pton(AF_INET, host.c_str(), &addr.sin_addr) <= 0) {
         Logger::error("Invalid address: " + host);
+        ::close(sockfd);
         return false;
     }
     int res = bind(sockfd, (const sockaddr*) &addr, sizeof(sockaddr_in));
     if (res < 0){
         Logger::error("Failed to bind");
-        return ;}
-    res = listen(sockfd, DEFAULT_BACKLOG);
+        ::close(sockfd);
+        return false;}
+    res = listen(sockfd, backlog);
     if (res < 0){
         Logger::error("Failed to listen");
-        return ;}
+        ::close(sockfd);
+        return false;}
     _fd = sockfd;
     _host = host;
     _port = port;
-    Logger::info("Listening...");
     return true;
 }
 

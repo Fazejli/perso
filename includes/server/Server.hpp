@@ -6,7 +6,7 @@
 # include "config/Config.hpp"
 # include "server/ListeningSocket.hpp"
 # include "server/Client.hpp"
-
+# include "errno.h"
 
 
 // The heart of webserv. Owns the listening sockets, the connected clients
