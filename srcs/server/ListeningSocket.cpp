@@ -1,11 +1,7 @@
 #include "server/ListeningSocket.hpp"
 #include "utils/Logger.hpp"
 #include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <poll.h>
+
 
 ListeningSocket::ListeningSocket()
     : _fd(-1), _host(""), _port(0) {}

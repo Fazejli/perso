@@ -1,3 +1,4 @@
+#include "Webserv.hpp" 
 #include "server/Server.hpp"
 #include "utils/Logger.hpp"
 #include "utils/StringUtils.hpp"
@@ -33,7 +34,7 @@ void Server::stop() {
     _running = false;
 }
 
-bool checkDuplicate(std::vector<ListeningSocket*>& sockets, const std::string host, int port){
+bool checkDuplicate(std::vector<ListeningSocket*>& sockets, const std::string &host, int port){
     std::vector<ListeningSocket*>::const_iterator it = sockets.begin();
     while (it != sockets.end()){
         if ((*it)->getPort() == port && (*it)->getHost() == host)
@@ -111,7 +112,9 @@ void Server::pollLoop(){
             ++iter;
         }
         if (poll(fds.data(), fds.size(), CLIENT_TIMEOUT_SECONDS) < 0){
-            Logger::error("Failed to poll..");
+            if (errno == EINTR)
+                continue;
+            Logger::error("Poll failed..");
             break ;
         }
         size_t count = _listeningSockets.size();
@@ -120,20 +123,19 @@ void Server::pollLoop(){
                 continue;
             if (i < count){
                 if (fds[i].revents & POLLIN)
-                    acceptNewConnection(_listeningSockets[i]);
-                else{
-                    int fd = fds[i].fd;
-                    Client* client = _clients[fd];
-                    if (fds[i].revents & (POLLERR | POLLHUP))
-                        closeClient(client);
-                    else if (fds[i].revents & POLLIN)
-                        handleClientRead(client);
-                    else if (fds[i].revents & POLLOUT)
-                        handleClientWrite(client); 
-                }
+                    acceptNewConnection(_listeningSockets[i]);}
+            else{
+                int fd = fds[i].fd;
+                Client* client = _clients[fd];
+                if (fds[i].revents & (POLLERR | POLLHUP))
+                    closeClient(client);
+                else if (fds[i].revents & POLLIN)
+                    handleClientRead(client);
+                else if (fds[i].revents & POLLOUT)
+                    handleClientWrite(client);
             }
         }
-        checkTimeouts();
+        //checkTimeouts();
     }
 }
 
@@ -163,9 +165,9 @@ void Server::handleClientRead(Client* c){
         if (errno != EWOULDBLOCK && errno != EAGAIN){
             Logger::error("Failed to read from client..");
             closeClient(c);
-            return ;
-        }
+            return ;}
         Logger::warn("No data to read from client.");
+        return;
     }
     else if (!msg_received){
         Logger::info("Client closed the connection.");
@@ -204,18 +206,5 @@ void Server::closeClient(Client* c){
 }
 
 void Server::checkTimeouts(){
-    time_t now = std::time(NULL);
-    std::vector<int> timedOutClients;
-    for (std::map<int, Client*>::const_iterator it = _clients.begin();
-         it != _clients.end(); ++it) {
-        Client* client = it->second;
-        if (client->hasTimedOut(now, CLIENT_TIMEOUT_SECONDS)) {
-            timedOutClients.push_back(it->first);
-        }
-    }
-    for (size_t i = 0; i < timedOutClients.size(); ++i) {
-        int fd = timedOutClients[i];
-        Logger::info("Client " + StringUtils::toString(fd) + " has timed out.");
-        closeClient(_clients[fd]);
-    }
+
 }
