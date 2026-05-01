@@ -156,6 +156,7 @@ void Server::acceptNewConnection(ListeningSocket* sock){
     Logger::info("New connection accepted.");
     Client* client = new Client(clientfd);
     _clients[clientfd] = client;
+    client->setState(Client::READING);
 }
 
 void Server::handleClientRead(Client* c){
